@@ -3,3 +3,5 @@ android/build/
 .godot/
 *.tmp
 research/NLM101/
+research/ant-world/
+research/ant-farm/
