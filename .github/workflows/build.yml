@@ -46,7 +46,7 @@ jobs:
       - name: Export Android APK
         run: |
           mkdir -p build
-          godot --headless --path . --export-release "Android" build/ant-simulator-2026.apk
+          godot --headless --path . --export-debug "Android" build/ant-simulator-2026.apk
 
       - name: Export Windows EXE
         run: |
