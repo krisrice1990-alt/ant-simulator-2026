@@ -1,0 +1,44 @@
+name: Build Ant Simulator 2026
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.7
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create Android debug keystore
+        run: |
+          keytool -genkey -v -keystore /tmp/debug.keystore \
+            -storepass android -alias androiddebugkey -keypass android \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+          # Point the Android export preset at the CI keystore
+          sed -i 's|^keystore/debug=.*|keystore/debug="/tmp/debug.keystore"|' export_presets.cfg || true
+          sed -i 's|^keystore/release=.*|keystore/release="/tmp/debug.keystore"|' export_presets.cfg || true
+
+      - name: Import project
+        run: godot --headless --import --path . 2>&1 | tail -5
+
+      - name: Export Android APK
+        run: |
+          mkdir -p build
+          godot --headless --path . --export-release "Android" build/ant-simulator-2026.apk
+
+      - name: Export Windows EXE
+        run: |
+          mkdir -p build
+          godot --headless --path . --export-release "Windows" "build/Ant Simulator 2026.exe"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ant-simulator-2026-builds
+          path: build/
