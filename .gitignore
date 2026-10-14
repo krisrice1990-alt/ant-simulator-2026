@@ -1,0 +1,10 @@
+*~
+.godot/
+tmp/
+*.translation
+misc/
+build/
+# Build-time injected GitHub release read token for the in-app updater.
+# Written by the release workflow from the UPDATE_READ_TOKEN secret;
+# never commit a real token.
+updater_token.txt
