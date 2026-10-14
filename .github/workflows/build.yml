@@ -8,11 +8,27 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # needed to publish the rolling dev-latest release
     container:
       image: barichello/godot-ci:4.7
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Write updater read token (optional)
+        # Secret UPDATE_READ_TOKEN must be a fine-grained PAT scoped to THIS
+        # repo with "Contents: read-only". It is baked into the exported game
+        # (res://updater_token.txt, gitignored) so the in-app updater can read
+        # the private dev-latest release. Without it, the updater falls back
+        # to opening the download in the browser.
+        run: |
+          if [ -n "${{ secrets.UPDATE_READ_TOKEN }}" ]; then
+            printf '%s' '${{ secrets.UPDATE_READ_TOKEN }}' > updater_token.txt
+            echo "updater token written"
+          else
+            echo "UPDATE_READ_TOKEN not set; in-app updater will use browser fallback"
+          fi
 
       - name: Create Android debug keystore
         run: |
@@ -35,10 +51,30 @@ jobs:
       - name: Export Windows EXE
         run: |
           mkdir -p build
-          godot --headless --path . --export-release "Windows" "build/Ant Simulator 2026.exe"
+          godot --headless --path . --export-release "Windows" build/ant-simulator-2026-windows.exe
+
+      - name: Zip Windows build
+        run: |
+          cd build
+          zip -j Ant-Simulator-2026-windows.zip ant-simulator-2026-windows.exe ant-simulator-2026-windows.pck
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ant-simulator-2026-builds
           path: build/
+
+      - name: Get version
+        id: ver
+        run: echo "version=$(grep -oP 'config/version="\K[^"]+' project.godot)" >> "$GITHUB_OUTPUT"
+
+      - name: Publish rolling dev release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: dev-latest
+          name: ${{ steps.ver.outputs.version }}
+          body: "Rolling development build of Ant Simulator 2026 - updated on every push to master."
+          allowUpdates: true
+          replacesArtifacts: true
+          makeLatest: false
+          artifacts: "build/ant-simulator-2026.apk,build/Ant-Simulator-2026-windows.zip"

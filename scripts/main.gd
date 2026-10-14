@@ -51,6 +51,10 @@ var dbg_panel: PanelContainer
 var dbg_labels := {}
 var _dbg_open := false
 
+# Game flow: pause menu + fps readout (tied to GameSettings).
+var pause_menu: PauseMenu
+var fps_label: Label
+
 # ---- In-app updater ---------------------------------------------------------
 var updater: Updater
 var upd_center: CenterContainer
@@ -70,6 +74,7 @@ const DEFAULT_HINT := "Toggle Dig, then tap dirt touching a tunnel. Workers fora
 
 
 func _ready() -> void:
+	GameSettings.load_settings()
 	Geo3D.ensure()
 	colony = Colony.new()
 	add_child(colony)
@@ -299,6 +304,8 @@ func _on_spider_died(spider: Spider) -> void:
 func _do_game_over() -> void:
 	game_over = true
 	print("GAME OVER: queen died (t=", snappedf(_autotest_t, 0.1), ")")
+	if pause_menu != null:
+		pause_menu.hide_silent()
 	gameover_panel.visible = true
 	get_tree().paused = true
 
@@ -594,6 +601,13 @@ func _build_hud() -> void:
 	gear.add_theme_font_size_override("font_size", 28)
 	gear.pressed.connect(_toggle_debug)
 	hb.add_child(gear)
+
+	var pb := Button.new()
+	pb.text = "⏸"
+	pb.custom_minimum_size = Vector2(64, 56)
+	pb.add_theme_font_size_override("font_size", 28)
+	pb.pressed.connect(_on_pause_pressed)
+	hb.add_child(pb)
 	hud.add_child(top)
 
 	hint_label = Label.new()
@@ -606,7 +620,16 @@ func _build_hud() -> void:
 	hint_label.add_theme_color_override("font_shadow_color", Color("#000000cc"))
 	hint_label.add_theme_constant_override("shadow_offset_x", 2)
 	hint_label.add_theme_constant_override("shadow_offset_y", 2)
+	hint_label.visible = GameSettings.show_hints
 	hud.add_child(hint_label)
+
+	fps_label = Label.new()
+	fps_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	fps_label.position = Vector2(12, 78)
+	fps_label.add_theme_font_size_override("font_size", 20)
+	fps_label.add_theme_color_override("font_color", Color("#e8a33d"))
+	fps_label.visible = GameSettings.show_fps
+	hud.add_child(fps_label)
 
 	# Game over panel.
 	gameover_panel = CenterContainer.new()
@@ -635,11 +658,21 @@ func _build_hud() -> void:
 	restart.custom_minimum_size = Vector2(220, 64)
 	restart.pressed.connect(_on_restart)
 	vb.add_child(restart)
+	var quitm := Button.new()
+	quitm.text = "Quit to Menu"
+	quitm.custom_minimum_size = Vector2(220, 64)
+	quitm.pressed.connect(_on_quit_to_menu)
+	vb.add_child(quitm)
 	gameover_panel.add_child(gp)
 	hud.add_child(gameover_panel)
 
 	_build_debug_panel(hud)
 	_build_update_dialog(hud)
+
+	# Pause overlay (Esc / P / HUD button).
+	pause_menu = PauseMenu.new()
+	pause_menu.setup(self)
+	add_child(pause_menu)
 
 
 # ---- Settings / debug panel -------------------------------------------------
@@ -898,12 +931,14 @@ func _update_hud() -> void:
 	food_label.text = "Food: %d" % food
 	worker_label.text = "Workers: %d" % _count_caste(Ant.Caste.WORKER)
 	soldier_label.text = "Soldiers: %d" % _count_caste(Ant.Caste.SOLDIER)
+	if fps_label != null and GameSettings.show_fps:
+		fps_label.text = "FPS: %d" % Engine.get_frames_per_second()
 	if _dbg_open:
 		_update_debug()
 
 
 func set_hint(text: String) -> void:
-	if hint_label == null:
+	if hint_label == null or not GameSettings.show_hints:
 		return
 	hint_label.text = text
 	hint_timer = 5.0
@@ -930,6 +965,16 @@ func _on_hatch_soldier() -> void:
 		return
 	if _lay_egg(Ant.Caste.WORKER, false):
 		set_hint("Soldier egg laid - hatching soon.")
+
+
+func _on_pause_pressed() -> void:
+	if pause_menu != null and not game_over:
+		pause_menu.toggle()
+
+
+func _on_quit_to_menu() -> void:
+	get_tree().paused = false
+	get_tree().change_scene_to_file("res://scenes/menu.tscn")
 
 
 func _on_restart() -> void:

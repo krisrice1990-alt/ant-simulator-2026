@@ -33,8 +33,9 @@ Prototype built 2026-10-14. Debug APK: `build/ant-simulator-2026-debug.apk`
    export GRADLE_USER_HOME explicitly.
 
 ## Game smoke test
-Headless autotest exercises digging, foraging, spider spawn and combat:
-`godot --headless --fixed-fps 60 --path . --quit-after 3600 -- --autotest`
+Headless autotest exercises digging, foraging, spider spawn and combat.
+The main scene is now the menu, so the game scene is passed explicitly:
+`godot --headless --fixed-fps 60 --path . res://scenes/main.tscn --quit-after 3600 -- --autotest`
 Look for `AUTOTEST:` lines and zero `SCRIPT ERROR`s.
 
 ## Rebuild

@@ -8,7 +8,7 @@ config_version=5
 config/name="Ant Simulator 2026"
 config/description="Ant colony simulation prototype: dig tunnels, forage for food, defend the queen."
 config/version="0.3.0-prototype"
-run/main_scene="res://scenes/main.tscn"
+run/main_scene="res://scenes/menu.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 boot_splash/bg_color=Color(0.09, 0.06, 0.04, 1)
 
