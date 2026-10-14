@@ -36,9 +36,11 @@ jobs:
             -storepass android -alias androiddebugkey -keypass android \
             -keyalg RSA -keysize 2048 -validity 10000 \
             -dname "CN=Android Debug,O=Android,C=US"
-          # Point the Android export preset at the CI keystore
+          # Point the Android export preset at the CI keystore (all three fields, so passwords match)
           sed -i 's|^keystore/debug=.*|keystore/debug="/tmp/debug.keystore"|' export_presets.cfg || true
-          sed -i 's|^keystore/release=.*|keystore/release="/tmp/debug.keystore"|' export_presets.cfg || true
+          sed -i 's|^keystore/debug_user=.*|keystore/debug_user="androiddebugkey"|' export_presets.cfg || true
+          sed -i 's|^keystore/debug_password=.*|keystore/debug_password="android"|' export_presets.cfg || true
+          grep -n "^keystore/" export_presets.cfg
 
       - name: Import project
         run: godot --headless --import --path . 2>&1 | tail -5
