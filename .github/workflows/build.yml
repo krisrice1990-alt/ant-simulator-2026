@@ -8,27 +8,29 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write # needed to publish the rolling dev-latest release
     container:
       image: barichello/godot-ci:4.7
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Write updater read token (optional)
-        # Secret UPDATE_READ_TOKEN must be a fine-grained PAT scoped to THIS
-        # repo with "Contents: read-only". It is baked into the exported game
-        # (res://updater_token.txt, gitignored) so the in-app updater can read
-        # the private dev-latest release. Without it, the updater falls back
-        # to opening the download in the browser.
+      - name: Install Godot export templates
         run: |
-          if [ -n "${{ secrets.UPDATE_READ_TOKEN }}" ]; then
-            printf '%s' '${{ secrets.UPDATE_READ_TOKEN }}' > updater_token.txt
-            echo "updater token written"
-          else
-            echo "UPDATE_READ_TOKEN not set; in-app updater will use browser fallback"
-          fi
+          TPL_DIR="$HOME/.local/share/godot/export_templates/4.7.stable"
+          mkdir -p "$TPL_DIR"
+          curl -sL -o /tmp/templates.tpz https://github.com/godotengine/godot/releases/download/4.7-stable/Godot_v4.7-stable_export_templates.tpz
+          unzip -q -o /tmp/templates.tpz -d /tmp/tpl
+          mv /tmp/tpl/templates/* "$TPL_DIR"/
+          ls "$TPL_DIR" | head -8
+
+      - name: Configure Java SDK path for Godot
+        run: |
+          JAVA_BIN=$(readlink -f $(which java))
+          JAVA_HOME_DIR=$(dirname $(dirname "$JAVA_BIN"))
+          echo "Java at: $JAVA_HOME_DIR"
+          mkdir -p "$HOME/.config/godot"
+          printf '[gd_resource type="EditorSettings" format=3]\n\n[resource]\nexport/android/java_sdk_path = "%s"\n' "$JAVA_HOME_DIR" > "$HOME/.config/godot/editor_settings-4.tres"
+          cat "$HOME/.config/godot/editor_settings-4.tres"
 
       - name: Create Android debug keystore
         run: |
@@ -36,11 +38,22 @@ jobs:
             -storepass android -alias androiddebugkey -keypass android \
             -keyalg RSA -keysize 2048 -validity 10000 \
             -dname "CN=Android Debug,O=Android,C=US"
-          # Point the Android export preset at the CI keystore (all three fields, so passwords match)
+          # Debug keystore: all three fields consistent; release: all empty (debug export)
           sed -i 's|^keystore/debug=.*|keystore/debug="/tmp/debug.keystore"|' export_presets.cfg || true
           sed -i 's|^keystore/debug_user=.*|keystore/debug_user="androiddebugkey"|' export_presets.cfg || true
           sed -i 's|^keystore/debug_password=.*|keystore/debug_password="android"|' export_presets.cfg || true
-          grep -n "^keystore/" export_presets.cfg
+          sed -i 's|^keystore/release=.*|keystore/release=""|' export_presets.cfg || true
+          sed -i 's|^keystore/release_user=.*|keystore/release_user=""|' export_presets.cfg || true
+          sed -i 's|^keystore/release_password=.*|keystore/release_password=""|' export_presets.cfg || true
+
+      - name: Inject updater read token
+        run: |
+          if [ -n "${{ secrets.UPDATE_READ_TOKEN }}" ]; then
+            printf '%s' "${{ secrets.UPDATE_READ_TOKEN }}" > updater_token.txt
+            echo "updater token injected"
+          else
+            echo "WARNING: UPDATE_READ_TOKEN secret not set - in-app updater will not work"
+          fi
 
       - name: Import project
         run: godot --headless --import --path . 2>&1 | tail -5
@@ -53,30 +66,20 @@ jobs:
       - name: Export Windows EXE
         run: |
           mkdir -p build
-          godot --headless --path . --export-release "Windows" build/ant-simulator-2026-windows.exe
+          godot --headless --path . --export-release "Windows" "build/Ant Simulator 2026.exe"
 
-      - name: Zip Windows build
-        run: |
-          cd build
-          zip -j Ant-Simulator-2026-windows.zip ant-simulator-2026-windows.exe ant-simulator-2026-windows.pck
+      - name: Publish rolling dev-latest release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: dev-latest
+          name: "Dev build ${{ github.sha }}"
+          prerelease: true
+          files: |
+            build/ant-simulator-2026.apk
+            build/Ant Simulator 2026.exe
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ant-simulator-2026-builds
           path: build/
-
-      - name: Get version
-        id: ver
-        run: echo "version=$(grep -oP 'config/version="\K[^"]+' project.godot)" >> "$GITHUB_OUTPUT"
-
-      - name: Publish rolling dev release
-        uses: ncipollo/release-action@v1
-        with:
-          tag: dev-latest
-          name: ${{ steps.ver.outputs.version }}
-          body: "Rolling development build of Ant Simulator 2026 - updated on every push to master."
-          allowUpdates: true
-          replacesArtifacts: true
-          makeLatest: false
-          artifacts: "build/ant-simulator-2026.apk,build/Ant-Simulator-2026-windows.zip"
