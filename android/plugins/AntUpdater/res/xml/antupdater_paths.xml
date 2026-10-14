@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- FileProvider paths for the in-app updater: serve the downloaded APK
+     from the app's private files dir (OS.get_user_data_dir()). -->
+<paths>
+    <files-path name="updates" path="." />
+    <external-files-path name="updates_ext" path="." />
+</paths>

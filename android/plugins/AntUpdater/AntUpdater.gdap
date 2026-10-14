@@ -1,0 +1,5 @@
+[config]
+
+name="AntUpdater"
+binary_type="local"
+binary="AntUpdater.aar"

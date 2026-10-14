@@ -1,0 +1,5 @@
+build/
+android/build/
+.godot/
+*.tmp
+research/NLM101/
